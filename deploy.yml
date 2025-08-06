@@ -1,0 +1,11 @@
+- name: Deploy Elasticsearch
+  hosts: elasticsearch_nodes
+  become: true
+  roles:
+    - elasticsearch
+
+- name: Deploy Kibana
+  hosts: kibana_nodes
+  become: true
+  roles:
+    - kibana

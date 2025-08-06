@@ -1,0 +1,15 @@
+es_version: "8.13.0"
+es_major_version: "8"
+es_cluster_name: "my-cluster"
+es_node_name: "{{ inventory_hostname }}"
+es_network_host: "0.0.0.0"
+es_http_port: 9200
+es_transport_port: 9300
+es_heap_size: "1g"
+es_seed_hosts:
+  - "40.172.111.19"
+  - "40.172.188.117"
+
+es_initial_master_nodes:
+  - "40.172.111.19"
+  - "40.172.188.117"

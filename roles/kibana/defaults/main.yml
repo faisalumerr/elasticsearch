@@ -1,0 +1,3 @@
+kibana_version: "8.13.0"
+kibana_major_version: "8"
+elasticsearch_url: "http://40.172.111.19:9200"
