@@ -21,5 +21,10 @@ node.roles:
 # ======================== X-Pack Security Configuration ========================
 xpack.security.enabled: false
 xpack.security.authc.api_key.enabled: false
-xpack.security.transport.ssl.enabled: false
 xpack.security.http.ssl.enabled: false
+
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.verification_mode: certificate
+xpack.security.transport.ssl.client_authentication: required
+xpack.security.transport.ssl.keystore.path: {{ cert_file }}
+xpack.security.transport.ssl.truststore.path: {{ cert_file }}

@@ -1,84 +1,187 @@
----
-- name: Install dependencies
-  apt:
-    name: ['apt-transport-https', 'wget', 'gnupg', 'openssl']
-    state: present
-    update_cache: yes
+# ---
+# - name: Install dependencies
+#   apt:
+#     name: ['apt-transport-https', 'wget', 'gnupg', 'openssl']
+#     state: present
+#     update_cache: yes
 
-- name: Create apt keyring directory
-  file:
-    path: /etc/apt/keyrings
-    state: directory
-    mode: '0755'
+# - name: Create apt keyring directory
+#   file:
+#     path: /etc/apt/keyrings
+#     state: directory
+#     mode: '0755'
 
-- name: Add Elasticsearch GPG key
-  shell: |
-    wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /etc/apt/keyrings/elasticsearch.gpg
-  args:
-    creates: /etc/apt/keyrings/elasticsearch.gpg
+# - name: Add Elasticsearch GPG key
+#   shell: |
+#     wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /etc/apt/keyrings/elasticsearch.gpg
+#   args:
+#     creates: /etc/apt/keyrings/elasticsearch.gpg
 
-- name: Add Elasticsearch APT repo
-  copy:
-    content: |
-      deb [signed-by=/etc/apt/keyrings/elasticsearch.gpg] https://artifacts.elastic.co/packages/{{ es_major_version }}.x/apt stable main
-    dest: /etc/apt/sources.list.d/elastic.list
+# - name: Add Elasticsearch APT repo
+#   copy:
+#     content: |
+#       deb [signed-by=/etc/apt/keyrings/elasticsearch.gpg] https://artifacts.elastic.co/packages/{{ es_major_version }}.x/apt stable main
+#     dest: /etc/apt/sources.list.d/elastic.list
 
-- name: Update apt cache immediately
-  apt:
-    update_cache: yes
-    cache_valid_time: 3600
+# - name: Update apt cache immediately
+#   apt:
+#     update_cache: yes
+#     cache_valid_time: 3600
 
-- name: Install Elasticsearch
-  apt:
-    name: "elasticsearch={{ es_version }}"
-    state: present
+# - name: Install Elasticsearch
+#   apt:
+#     name: "elasticsearch={{ es_version }}"
+#     state: present
 
 
-# === Directory Setup ===
-- name: Create data directory
-  file:
-    path: "{{ es_data_dir | default('/var/lib/elasticsearch') }}"
-    state: directory
-    owner: elasticsearch
-    group: elasticsearch
-    mode: '0750'
+# # === Directory Setup ===
+# - name: Create data directory
+#   file:
+#     path: "{{ es_data_dir | default('/var/lib/elasticsearch') }}"
+#     state: directory
+#     owner: elasticsearch
+#     group: elasticsearch
+#     mode: '0750'
 
-- name: Create logs directory
-  file:
-    path: "{{ es_log_dir | default('/var/log/elasticsearch') }}"
-    state: directory
-    owner: elasticsearch
-    group: elasticsearch
-    mode: '0755'
+# - name: Create logs directory
+#   file:
+#     path: "{{ es_log_dir | default('/var/log/elasticsearch') }}"
+#     state: directory
+#     owner: elasticsearch
+#     group: elasticsearch
+#     mode: '0755'
 
-# === Configuration ===
-- name: Configure elasticsearch.yml
-  template:
-    src: elasticsearch.yml.j2
-    dest: /etc/elasticsearch/elasticsearch.yml
-    owner: root
-    group: elasticsearch
-    mode: '0640'
 
-- name: Set JVM heap size
-  blockinfile:
-    path: /etc/elasticsearch/jvm.options.d/heap.options
-    create: yes
-    block: |
-      -Xms{{ es_heap_size }}
-      -Xmx{{ es_heap_size }}
+# - name: Set JVM heap size
+#   blockinfile:
+#     path: /etc/elasticsearch/jvm.options.d/heap.options
+#     create: yes
+#     block: |
+#       -Xms{{ es_heap_size }}
+#       -Xmx{{ es_heap_size }}
 
-- name: Ensure IP and hostname entry exists in /etc/hosts
-  lineinfile:
-    path: /etc/hosts
-    line: "{{ hostvars[item].ansible_host }} {{ hostvars[item].node_name | default(item) }}"
-    state: present
-  loop: "{{ groups['elasticsearch_nodes'] }}"
-  
-# === Service Management ===
+# - name: Ensure IP and hostname entry exists in /etc/hosts
+#   lineinfile:
+#     path: /etc/hosts
+#     line: "{{ hostvars[item].ansible_host }} {{ hostvars[item].node_name | default(item) }}"
+#     state: present
+#   loop: "{{ groups['elasticsearch_nodes'] }}"
+
+
+# - name: Create certs directory
+#   file:
+#     path: "{{ certs_dir }}"
+#     state: directory
+#     mode: '0755'
+#   when: inventory_hostname == "vm1"
+
+# - name: Generate CA for Elasticsearch
+#   command: >
+#     /usr/share/elasticsearch/bin/elasticsearch-certutil ca
+#     --silent
+#     --out {{ certs_dir }}/{{ ca_file }}
+#     --pass ""
+#   args:
+#     creates: "{{ certs_dir }}/{{ ca_file }}"
+#   when: inventory_hostname == "vm1"
+
+# - name: Generate node certificate and private key on VM1 (auto-enter) and set permissions
+#   shell: |
+#     printf '\n\n' | /usr/share/elasticsearch/bin/elasticsearch-certutil cert \
+#       --ca {{ certs_dir }}/{{ ca_file }} \
+#       --out {{ certs_dir }}/{{ cert_file }}
+#     chmod 0644 {{ certs_dir }}/{{ cert_file }}
+#   args:
+#     creates: "{{ certs_dir }}/{{ cert_file }}"
+#   become: yes
+#   when: inventory_hostname == "vm1"
+#   vars:
+#     certs_dir: /tmp/es_certs
+#     ca_file: elastic-stack-ca.p12
+
+# - name: Set permissions on CA and node certificate files to 0644
+#   file:
+#     path: "{{ item }}"
+#     mode: '0644'
+#   loop:
+#     - "{{ certs_dir }}/{{ ca_file }}"
+#     - "{{ certs_dir }}/{{ cert_file }}"
+#   when: inventory_hostname == "vm1"
+
+
+# - name: Fetch CA file from VM1 to Ansible controller
+#   fetch:
+#     src: "{{ certs_dir }}/{{ cert_file }}"
+#     dest: "{{ playbook_dir }}/certs/{{ cert_file }}"
+#     flat: yes
+#   when: inventory_hostname == "vm1"
+
+# - name: Copy CA file from controller to /etc/elasticsearch on all nodes
+#   copy:
+#     src: "{{ playbook_dir }}/certs/{{ cert_file }}"
+#     dest: "/etc/elasticsearch/{{ cert_file }}"
+#     owner: root
+#     group: root
+#     mode: '0644'
+#   become: yes
+
+# - name: Check if keystore password exists
+#   command: /usr/share/elasticsearch/bin/elasticsearch-keystore list
+#   register: keystore_list
+#   changed_when: false
+#   become: yes
+
+# - name: Add empty password for keystore
+#   shell: printf '\n' | /usr/share/elasticsearch/bin/elasticsearch-keystore add xpack.security.transport.ssl.keystore.secure_password
+#   become: yes
+#   when: "'xpack.security.transport.ssl.keystore.secure_password' not in keystore_list.stdout"
+
+# - name: Add empty password for truststore
+#   shell: printf '\n' | /usr/share/elasticsearch/bin/elasticsearch-keystore add xpack.security.transport.ssl.truststore.secure_password
+#   become: yes
+#   when: "'xpack.security.transport.ssl.truststore.secure_password' not in keystore_list.stdout"
+
+# - name: Configure elasticsearch.yml
+#   template:
+#     src: elasticsearch.yml.j2
+#     dest: /etc/elasticsearch/elasticsearch.yml
+#     owner: root
+#     group: elasticsearch
+#     mode: '0640'
+
+
+# # === Service Management ===
+# - name: Enable and start Elasticsearch
+#   systemd:
+#     name: elasticsearch
+#     enabled: true
+#     state: restarted
+#     daemon_reload: yes
+
+
+- name: Set xpack.security.enabled to true in Elasticsearch configuration
+  replace:
+    path: /etc/elasticsearch/elasticsearch.yml
+    regexp: '^xpack\.security\.enabled:\s*false'
+    replace: 'xpack.security.enabled: true'
+  become: yes
+
 - name: Enable and start Elasticsearch
   systemd:
     name: elasticsearch
     enabled: true
     state: restarted
     daemon_reload: yes
+
+- name: Reset elastic user password interactively
+  shell: |
+    printf 'y\n{{ elastic_password }}\n{{ elastic_password }}\n' | \
+    /usr/share/elasticsearch/bin/elasticsearch-reset-password -i -u elastic
+  become: yes
+
+
+- name: Reset kibana_system user password interactively
+  shell: |
+    printf 'y\n{{ kibana_system_password }}\n{{ kibana_system_password }}\n' | \
+    /usr/share/elasticsearch/bin/elasticsearch-reset-password -i -u kibana_system
+  become: yes

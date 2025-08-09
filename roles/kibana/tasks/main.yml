@@ -30,8 +30,30 @@
     group: kibana
     mode: 0640
 
-- name: Enable and start Kibana
+- name: Ensure elasticsearch.username is set in Kibana config on vm2
+  lineinfile:
+    path: /etc/kibana/kibana.yml
+    line: 'elasticsearch.username: "kibana_system"'
+    state: present
+  when: inventory_hostname == "vm2"
+  become: yes
+
+- name: Create Kibana keystore if not exists
+  command: /usr/share/kibana/bin/kibana-keystore create
+  args:
+    creates: /etc/kibana/kibana.keystore
+  become: yes
+  when: inventory_hostname == "vm2"
+
+- name: Add kibana_system password to Kibana keystore
+  shell: |
+    printf '{{ kibana_system_password }}\n' | /usr/share/kibana/bin/kibana-keystore add elasticsearch.password --stdin
+  become: yes
+  when: inventory_hostname == "vm2"
+
+
+- name: Enable and restart Kibana
   systemd:
     name: kibana
     enabled: yes
-    state: started
+    state: restarted

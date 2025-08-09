@@ -12,3 +12,7 @@ es_seed_hosts:
 
 es_initial_master_nodes:
   - "vm1"
+
+certs_dir: /tmp/es_certs
+ca_file: elastic-stack-ca.p12
+cert_file: elastic-certificates.p12
