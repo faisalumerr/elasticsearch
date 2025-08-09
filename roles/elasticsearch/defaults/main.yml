@@ -8,8 +8,7 @@ es_transport_port: 9300
 es_heap_size: "1g"
 es_seed_hosts:
   - "40.172.111.19"
-  - "40.172.188.117"
+  - "3.29.234.142"
 
 es_initial_master_nodes:
-  - "40.172.111.19"
-  - "40.172.188.117"
+  - "vm1"

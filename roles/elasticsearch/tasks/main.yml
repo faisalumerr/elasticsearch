@@ -1,6 +1,7 @@
+---
 - name: Install dependencies
   apt:
-    name: ['apt-transport-https', 'wget', 'gnupg']
+    name: ['apt-transport-https', 'wget', 'gnupg', 'openssl']
     state: present
     update_cache: yes
 
@@ -32,8 +33,8 @@
     name: "elasticsearch={{ es_version }}"
     state: present
 
-# === Directory Setup ===
 
+# === Directory Setup ===
 - name: Create data directory
   file:
     path: "{{ es_data_dir | default('/var/lib/elasticsearch') }}"
@@ -51,7 +52,6 @@
     mode: '0755'
 
 # === Configuration ===
-
 - name: Configure elasticsearch.yml
   template:
     src: elasticsearch.yml.j2
@@ -68,34 +68,17 @@
       -Xms{{ es_heap_size }}
       -Xmx{{ es_heap_size }}
 
-# === Service ===
-
+- name: Ensure IP and hostname entry exists in /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ hostvars[item].ansible_host }} {{ hostvars[item].node_name | default(item) }}"
+    state: present
+  loop: "{{ groups['elasticsearch_nodes'] }}"
+  
+# === Service Management ===
 - name: Enable and start Elasticsearch
   systemd:
     name: elasticsearch
     enabled: true
     state: restarted
     daemon_reload: yes
-
-- name: Reset elastic password
-  command: "/usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic --batch --url https://localhost:9200"
-  register: elastic_pass_output
-  become: true
-  changed_when: "'password:' in elastic_pass_output.stdout"
-
-- name: Show elastic password
-  debug:
-    msg: "{{ elastic_pass_output.stdout }}"
-  when: "'password:' in elastic_pass_output.stdout"
-
-
-- name: Reset kibana_system password
-  command: "/usr/share/elasticsearch/bin/elasticsearch-reset-password -u kibana_system --batch --url https://localhost:9200"
-  register: kibana_pass_output
-  become: true
-  changed_when: "'password:' in kibana_pass_output.stdout"
-
-- name: Show kibana_system password
-  debug:
-    msg: "{{ kibana_pass_output.stdout }}"
-  when: "'password:' in kibana_pass_output.stdout"
