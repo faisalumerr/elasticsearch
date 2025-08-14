@@ -1,0 +1,48 @@
+# --- General ---
+kibana_host: "{{ hostvars[groups['kibana_nodes'][0]].ansible_host }}"
+es_vm1_ip: "{{ hostvars['vm1'].ansible_host }}"
+es_vm2_ip: "{{ hostvars['vm2'].ansible_host }}"
+
+# Kibana auth
+kibana_user: "elastic"
+kibana_pass: "elastic123"
+
+# Paths on VM1
+p12_path: "/tmp/es_certs/elastic-stack-ca.p12"
+es_cert_dir: "/etc/elasticsearch"
+es_ca_cert: "{{ es_cert_dir }}/cert.crt"
+es_ca_key:  "{{ es_cert_dir }}/private.key"
+
+# elasticsearch-certutil settings (VM1)
+es_home: "/usr/share/elasticsearch"
+fleet_zip_path: "{{ es_home }}/fleet-server.zip"
+fleet_cert_dir: "{{ es_home }}/fleet-server"   # unzip target
+fleet_cert_file: "{{ fleet_cert_dir }}/fleet-server.crt"
+fleet_key_file:  "{{ fleet_cert_dir }}/fleet-server.key"
+fleet_dns_name: "vm1"
+fleet_ip: "{{ es_vm1_ip }}"   # uses inventory IP for VM1
+
+# Fleet Output (default for integrations & monitoring)
+fleet_output_name: "Default Custom ES Output"
+fleet_output_hosts: ["https://{{ es_vm1_ip }}:9200"]
+fleet_output_yaml: 'ssl.certificate_authorities: ["/etc/elasticsearch/cert.crt"]'
+
+# Agent Policy
+agent_policy_name: "My New Agent Policy"
+agent_policy_desc: "Policy for production servers"
+agent_policy_namespace: "default"
+
+# Installer commands (assumes elastic-agent binary is available at these paths)
+elastic_agent_cmd_vm1: "/usr/local/bin/elastic-agent"       # Adjust if different
+elastic_agent_cmd_control: "/usr/local/bin/elastic-agent"   # Adjust if different
+
+# Fleet service (Fleet Server) and agent enrollment
+fleet_server_url: "https://{{ es_vm1_ip }}:8220"   # Fleet Server will listen on VM1:8220
+fleet_server_es_url: "https://{{ es_vm2_ip }}:9200"  # ES for Fleet Server (your vm2 runs Kibana & ES)
+fleet_server_policy_name: "fleet-server-policy"    # Must exist; if not, agent will create a default
+fleet_server_port: 8220
+
+# Safety: skip TLS verify to Kibana API (self-signed)
+kibana_validate_certs: false
+basic_auth: "{{ (kibana_user + ':' + kibana_pass) | b64encode }}"
+

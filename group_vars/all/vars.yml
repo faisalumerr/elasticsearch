@@ -1,0 +1,30 @@
+es_version: "8.13.0"
+es_major_version: "8"
+es_cluster_name: "elastic-cluster"
+
+es_node_name: "{{ inventory_hostname }}"
+es_network_host: "0.0.0.0"
+es_http_port: 9200
+es_transport_port: 9300
+es_heap_size: "1g"
+
+# Dynamically get IPs of all Elasticsearch nodes
+es_seed_hosts: "{{ groups['elasticsearch_nodes'] | map('extract', hostvars, ['ansible_host']) | list }}"
+
+# You can choose to set this dynamically or define a list if you have preferred master nodes
+es_initial_master_nodes: "{{ groups['elasticsearch_nodes'] | list }}"
+
+# SSL certificate paths
+certs_dir: /tmp/es_certs
+ca_file: elastic-stack-ca.p12
+cert_file: elastic-certificates.p12
+output_zip: "/usr/share/elasticsearch/elasticsearch-ssl-http.zip"
+ca_path: "{{ certs_dir }}/{{ ca_file }}"
+
+# Dynamically build node names, hostnames, and IPs
+node_names: "{{ groups['elasticsearch_nodes'] | list }}"
+hostnames: "{{ groups['elasticsearch_nodes'] | list }}"
+ip_addresses: "{{ groups['elasticsearch_nodes'] | map('extract', hostvars, ['ansible_host']) | list }}"
+
+# Kibana path
+kbn_path_config: "/etc/kibana/"

@@ -1,3 +1,4 @@
+---
 - name: Install dependencies
   apt:
     name: ['apt-transport-https', 'wget', 'gnupg']
@@ -16,11 +17,21 @@
       deb [signed-by=/etc/apt/keyrings/elastic.gpg] https://artifacts.elastic.co/packages/{{ kibana_major_version }}.x/apt stable main
     dest: /etc/apt/sources.list.d/elastic.list
 
-- name: Install Kibana
-  apt:
-    name: kibana={{ kibana_version }}
-    state: present
-    update_cache: yes
+# - name: Install Kibana
+#   apt:
+#     name: kibana={{ kibana_version }}
+#     state: present
+#     update_cache: yes
+
+
+
+- name: Manually install Kibana (as a workaround)
+  shell: |
+    apt-get update && apt-get install -y kibana={{ kibana_version }}
+  args:
+    executable: /bin/bash
+  environment:
+    DEBIAN_FRONTEND: noninteractive
 
 - name: Configure kibana.yml
   template:

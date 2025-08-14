@@ -1,0 +1,9 @@
+---
+- name: Include cert tasks (VM1 + copy to control + copy to VM2)
+  import_tasks: certs.yml
+
+- name: Configure Fleet (Output, Policy, Tokens) via Kibana API
+  import_tasks: kibana_fleet.yml
+
+- name: Enroll Fleet Server on VM1 and Agent on control
+  import_tasks: enroll.yml

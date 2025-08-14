@@ -1,0 +1,94 @@
+# ---
+# # roles/fleet-end-to-end/tasks/enroll_agents.yml
+
+# # --- 1) Create persistent directory ---
+# - name: Ensure persistent directory exists for Elastic Agent
+#   file:
+#     path: /opt/elastic-agent
+#     state: directory
+#     owner: root
+#     group: root
+#     mode: '0755'
+#   become: yes
+#   when: inventory_hostname == "vm1"
+
+# # --- 2) Download Elastic Agent ---
+# - name: Download Elastic Agent
+#   get_url:
+#     url: "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-8.13.0-linux-x86_64.tar.gz"
+#     dest: "~/elastic-agent-8.13.0-linux-x86_64.tar.gz"
+#     mode: '0755'
+#   become: yes
+#   when: inventory_hostname == "vm1"
+
+# # --- 3) Extract Elastic Agent ---
+# - name: Extract Elastic Agent
+#   unarchive:
+#     src: "~/elastic-agent-8.13.0-linux-x86_64.tar.gz"
+#     dest: "~/"
+#     remote_src: yes
+#     creates: "~/elastic-agent-8.13.0-linux-x86_64"
+#   become: yes
+#   when: inventory_hostname == "vm1"
+# # --- 4) Set binary path ---
+# - name: Set elastic_agent_cmd path
+#   set_fact:
+#     elastic_agent_cmd: "~/elastic-agent-8.13.0-linux-x86_64/elastic-agent"
+
+# # --- 5) Ensure binary exists ---
+# - name: Ensure elastic-agent binary exists on VM1
+#   stat:
+#     path: "{{ elastic_agent_cmd }}"
+#   register: ea_vm1_bin
+#   when: inventory_hostname == "vm1"
+
+# - name: Fail if elastic-agent binary not found on VM1
+#   fail:
+#     msg: "elastic-agent binary not found at {{ elastic_agent_cmd }}"
+#   when:
+#     - inventory_hostname == "vm1"
+#     - ea_vm1_bin.stat.exists is not defined or not ea_vm1_bin.stat.exists
+
+# - name: Check if elastic-agent is already installed
+#   stat:
+#     path: "/etc/systemd/system/elastic-agent.service"
+#   register: ea_service
+#   when: inventory_hostname == "vm1"
+
+# - name: Install / Enroll Fleet Server on VM1
+#   shell: >
+#     {{ elastic_agent_cmd }} install
+#     --url={{ fleet_server_url }}
+#     --fleet-server-es={{ fleet_server_es_url }}
+#     --fleet-server-service-token={{ hostvars['vm2'].enrollment_token }}
+#     --fleet-server-policy={{ fleet_server_policy_name }}
+#     --certificate-authorities={{ es_ca_cert }}
+#     --fleet-server-es-ca={{ es_ca_cert }}
+#     --fleet-server-cert={{ fleet_cert_file }}
+#     --fleet-server-cert-key={{ fleet_key_file }}
+#     --fleet-server-port={{ fleet_server_port }}
+#     --insecure
+#     --force
+#   args:
+#     executable: /bin/bash
+#   register: fleet_server_install
+#   changed_when: "'Elastic Agent has been installed' in fleet_server_install.stdout | default('') or fleet_server_install.rc == 0"
+#   when:
+#     - inventory_hostname == "vm1"
+#     - not ea_service.stat.exists
+
+
+# # --- 7) Install / Enroll Elastic Agent on control node ---
+# - name: Install / Enroll Elastic Agent on control node
+#   shell: >
+#     {{ elastic_agent_cmd }} install
+#     --url=https://{{ es_vm2_ip }}:8220
+#     --enrollment-token={{ hostvars['localhost'].enrollment_token }}
+#     --certificate-authorities={{ es_ca_cert }}
+#     --insecure
+#   args:
+#     executable: /bin/bash
+#   register: ea_install_control
+#   changed_when: "'Elastic Agent has been installed' in ea_install_control.stdout | default('') or ea_install_control.rc == 0"
+#   become: yes
+#   when: inventory_hostname == "localhost"

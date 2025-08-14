@@ -1,0 +1,139 @@
+---
+# 1) Run on VM1: extract CA cert and private key from PKCS#12
+- name: Ensure destination directory exists
+  file:
+    path: "{{ es_cert_dir }}"
+    state: directory
+    mode: "0755"
+  when: inventory_hostname == "vm1"
+
+- name: Extract CA certificate from PKCS12 (cert.crt)
+  command: >
+    openssl pkcs12 -in {{ p12_path }} -out {{ es_ca_cert }} -clcerts -nokeys -passin pass:
+  args:
+    creates: "{{ es_ca_cert }}"
+  when: inventory_hostname == "vm1"
+
+- name: Extract private key from PKCS12 (private.key)
+  command: >
+    openssl pkcs12 -in {{ p12_path }} -out {{ es_ca_key }} -nocerts -nodes -passin pass:
+  args:
+    creates: "{{ es_ca_key }}"
+  when: inventory_hostname == "vm1"
+
+- name: Set permissions on CA cert and key
+  file:
+    path: "{{ item.path }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ es_ca_cert }}", mode: "0644" }
+    - { path: "{{ es_ca_key }}",  mode: "0600" }
+  when: inventory_hostname == "vm1"
+
+# 2) Copy cert to control node
+- name: Ensure cert is world-readable (for fetch)
+  file:
+    path: "{{ es_ca_cert }}"
+    mode: "0644"
+  when: inventory_hostname == "vm1"
+
+- name: Ensure tmp folder exists on control node
+  delegate_to: localhost
+  run_once: true
+  file:
+    path: "{{ playbook_dir }}/tmp"
+    state: directory
+    mode: "0755"
+
+- name: Fetch cert to control node /tmp
+  fetch:
+    src: "{{ es_ca_cert }}"
+    dest: "{{ playbook_dir }}/tmp/cert.crt"
+    flat: true
+  when: inventory_hostname == "vm1"
+
+
+# 3) Copy cert to VM2
+- name: Ensure ES cert dir exists on VM2
+  file:
+    path: "{{ es_cert_dir }}"
+    state: directory
+    mode: "0755"
+  when: inventory_hostname == "vm2"
+
+- name: Copy cert.crt to VM2
+  copy:
+    src: "{{ playbook_dir }}/tmp/cert.crt"
+    dest: "{{ es_ca_cert }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: inventory_hostname == "vm2"
+
+# Check if fleet-server.zip already exists
+- name: Check if fleet-server.zip exists
+  stat:
+    path: "{{ fleet_zip_path }}"
+  register: fleet_zip_stat
+  when: inventory_hostname == "vm1"
+
+# Generate Fleet Server certs only if it doesn't exist
+- name: Generate fleet-server.zip via elasticsearch-certutil (non-interactive)
+  shell: >
+    cd {{ es_home }} &&
+    ./bin/elasticsearch-certutil cert
+    --name fleet-server
+    --ca-cert {{ es_ca_cert }}
+    --ca-key {{ es_ca_key }}
+    --dns {{ fleet_dns_name }}
+    --ip {{ fleet_ip }}
+    --pem
+    --out {{ fleet_zip_path }}
+  args:
+    executable: /bin/bash
+  changed_when: "'writing' in result.stdout | default('') or 'generated' in result.stdout | default('')"
+  register: result
+  when:
+    - inventory_hostname == "vm1"
+    - not fleet_zip_stat.stat.exists
+
+- name: Ensure fleet cert dir exists
+  file:
+    path: "{{ fleet_cert_dir }}"
+    state: directory
+    mode: "0755"
+  when: inventory_hostname == "vm1"
+
+- name: fleet-server.zip to Fleet Server directory without extra folder
+  unarchive:
+    src: "{{ fleet_zip_path }}"
+    dest: /usr/share/elasticsearch/fleet-server/
+    remote_src: yes
+    extra_opts: [ "-j" ]   # -j = junk paths (prevents nested dirs)
+  become: true
+  when: inventory_hostname == "vm1"
+
+- name: Set perms on fleet certs
+  file:
+    path: "{{ item.path }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ fleet_cert_dir }}", mode: "0755" }
+  when: inventory_hostname == "vm1"
+
+# Note: files inside zip are typically named like: fleet-server/fleet-server.crt/.key
+- name: Assert fleet cert files exist
+  stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ fleet_cert_file }}"
+    - "{{ fleet_key_file }}"
+  register: fleet_cert_stats
+  when: inventory_hostname == "vm1"
+
+- name: Fail if fleet cert files not found
+  fail:
+    msg: "Fleet cert/key missing under {{ fleet_cert_dir }}. Check zip contents."
+  when:
+    - inventory_hostname == "vm1"
+    - fleet_cert_stats.results | selectattr('stat.exists','equalto',false) | list | length > 0

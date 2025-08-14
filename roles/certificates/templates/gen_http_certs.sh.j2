@@ -1,0 +1,24 @@
+#!/bin/bash
+/usr/share/elasticsearch/bin/elasticsearch-certutil http <<EOF
+n
+y
+/tmp/es_certs/elastic-stack-ca.p12
+
+5y
+y
+es-01
+{% for host in groups['elasticsearch_nodes'] %}
+es-0{{ loop.index }}
+{% endfor %}
+
+Y
+{% for host in groups['elasticsearch_nodes'] %}
+{{ hostvars[host].ansible_host }}
+{% endfor %}
+
+Y
+n
+n
+
+
+EOF

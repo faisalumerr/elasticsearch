@@ -7,8 +7,8 @@ es_http_port: 9200
 es_transport_port: 9300
 es_heap_size: "1g"
 es_seed_hosts:
-  - "40.172.111.19"
-  - "3.29.234.142"
+  - "192.168.1.13"
+  - "192.168.1.14"
 
 es_initial_master_nodes:
   - "vm1"
@@ -16,3 +16,13 @@ es_initial_master_nodes:
 certs_dir: /tmp/es_certs
 ca_file: elastic-stack-ca.p12
 cert_file: elastic-certificates.p12
+
+
+
+output_zip: "/usr/share/elasticsearch/elasticsearch-ssl-http.zip"
+ca_path: "/tmp/es_certs/elastic-stack-ca.p12"
+node_names: ["es-01"]
+hostnames: ["es-01", "es-02"]
+ip_addresses: ["192.168.1.14", "192.168.1.13"]
+
+kbn_path_config: "/etc/kibana/"

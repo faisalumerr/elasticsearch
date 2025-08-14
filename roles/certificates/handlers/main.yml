@@ -1,0 +1,6 @@
+# If you're using a role, this goes in roles/elasticsearch/handlers/main.yml
+
+- name: Restart Elasticsearch
+  service:
+    name: elasticsearch
+    state: restarted

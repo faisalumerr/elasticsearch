@@ -1,0 +1,173 @@
+# ---
+# # roles/fleet-kibana-api/tasks/main.yml
+# - name: Get existing Fleet outputs
+#   uri:
+#     url: "https://{{ kibana_host }}:5601/api/fleet/outputs"
+#     method: GET
+#     headers:
+#       kbn-xsrf: "true"
+#       Authorization: "Basic {{ basic_auth }}"
+#     validate_certs: "{{ kibana_validate_certs }}"
+#   register: outputs_list
+#   when: inventory_hostname == "vm2"
+
+# - name: Find output by name
+#   set_fact:
+#     existing_output: >-
+#       {{ (outputs_list.json['items'] 
+#           | selectattr('name', 'equalto', fleet_output_name) 
+#           | list 
+#           | first) 
+#          | default({}) }}
+#   when: inventory_hostname == "vm2"
+
+# - name: Create or update Fleet Output
+#   uri:
+#     url: "https://{{ kibana_host }}:5601/api/fleet/outputs{{ '/' + existing_output.id if existing_output.id is defined else '' }}"
+#     method: "{{ 'POST' if existing_output.id is not defined else 'PUT' }}"
+#     headers:
+#       kbn-xsrf: "true"
+#       Authorization: "Basic {{ basic_auth }}"
+#       Content-Type: "application/json"
+#     body_format: json
+#     body:
+#       name: "{{ fleet_output_name }}"
+#       type: "elasticsearch"
+#       hosts: "{{ fleet_output_hosts }}"
+#       is_default: true
+#       is_default_monitoring: true
+#       config_yaml: "{{ fleet_output_yaml }}"
+#     validate_certs: "{{ kibana_validate_certs }}"
+#   register: output_resp
+#   when: inventory_hostname == "vm2"
+
+# - name: List agent policies
+#   uri:
+#     url: "https://{{ kibana_host }}:5601/api/fleet/agent_policies"
+#     method: GET
+#     headers:
+#       kbn-xsrf: "true"
+#       Authorization: "Basic {{ basic_auth }}"
+#     validate_certs: "{{ kibana_validate_certs }}"
+#   register: policies_list
+#   failed_when: false
+#   when: inventory_hostname == "vm2"
+
+# - name: Find existing agent policy by name
+#   set_fact:
+#     existing_policy: >-
+#       {{ (policies_list.json['items'] 
+#           | selectattr('name', 'equalto', agent_policy_name) 
+#           | list 
+#           | first) 
+#          | default({}) }}
+#   when: inventory_hostname == "vm2"
+
+# - name: Create agent policy if missing
+#   uri:
+#     url: "https://{{ kibana_host }}:5601/api/fleet/agent_policies"
+#     method: POST
+#     headers:
+#       kbn-xsrf: "true"
+#       Authorization: "Basic {{ basic_auth }}"
+#       Content-Type: "application/json"
+#     body_format: json
+#     body:
+#       name: "{{ agent_policy_name }}"
+#       namespace: "{{ agent_policy_namespace }}"
+#       description: "{{ agent_policy_desc }}"
+#       monitoring_enabled: ["logs", "metrics"]
+#     validate_certs: "{{ kibana_validate_certs }}"
+#   register: created_policy
+#   when:
+#     - inventory_hostname == "vm2"
+#     - existing_policy | length == 0
+
+# - name: Set agent_policy_id fact
+#   set_fact:
+#     agent_policy_id: >-
+#       {{ (created_policy.json['item'].id if created_policy is defined and created_policy.json is defined and 'item' in created_policy.json else existing_policy.id) }}
+#   when: inventory_hostname == "vm2"
+
+# - name: List enrollment API keys
+#   uri:
+#     url: "https://{{ kibana_host }}:5601/api/fleet/enrollment_api_keys"
+#     method: GET
+#     headers:
+#       kbn-xsrf: "true"
+#       Authorization: "Basic {{ basic_auth }}"
+#     validate_certs: "{{ kibana_validate_certs }}"
+#   register: enrollment_keys_list
+#   failed_when: false
+#   when: inventory_hostname == "vm2"
+
+# - name: Find existing enrollment key for policy
+#   set_fact:
+#     existing_enrollment_key: >-
+#       {{ (enrollment_keys_list.json['items'] 
+#           | selectattr('policy_id', 'equalto', agent_policy_id)
+#           | selectattr('name', 'equalto', 'Prod Servers Enrollment Token')
+#           | list
+#           | first) 
+#          | default({}) }}
+#   when: inventory_hostname == "vm2"
+
+
+# # - name: Debug enrollment keys
+# #   debug:
+# #     var: enrollment_keys_list
+# #   when: inventory_hostname == "vm2"
+
+# - name: Delete revoked enrollment keys for the agent policy
+#   uri:
+#     url: "https://{{ kibana_host }}:5601/api/fleet/enrollment_api_keys/{{ item.id }}"
+#     method: DELETE
+#     headers:
+#       kbn-xsrf: "true"
+#       Authorization: "Basic {{ basic_auth }}"
+#     validate_certs: "{{ kibana_validate_certs }}"
+#   loop: >-
+#     {{ (enrollment_keys_list.json['items']
+#         | selectattr('policy_id', 'equalto', agent_policy_id)
+#         | selectattr('active', 'equalto', False)
+#         | list) }}
+#   loop_control:
+#     label: "{{ item.name }}"
+#   when: inventory_hostname == "vm2"
+
+
+
+
+# - name: Create enrollment API key if missing or deleted
+#   uri:
+#     url: "https://{{ kibana_host }}:5601/api/fleet/enrollment_api_keys"
+#     method: POST
+#     headers:
+#       kbn-xsrf: "true"
+#       Authorization: "Basic {{ basic_auth }}"
+#       Content-Type: "application/json"
+#     body_format: json
+#     body:
+#       name: "Prod Servers Enrollment Token"
+#       policy_id: "{{ agent_policy_id }}"
+#     validate_certs: "{{ kibana_validate_certs }}"
+#   register: enroll_key_resp
+#   failed_when: false
+#   when:
+#     - inventory_hostname == "vm2"
+#     - existing_enrollment_key | length == 0 or (existing_enrollment_key.active is defined and not existing_enrollment_key.active)
+
+# - name: Set enrollment_token fact
+#   set_fact:
+#     enrollment_token: >-
+#       {{ (enroll_key_resp.json['item'].api_key if enroll_key_resp is defined and enroll_key_resp.json is defined and 'item' in enroll_key_resp.json else existing_enrollment_key.api_key | default('')) }}
+#   when: inventory_hostname == "vm2"
+
+# - name: Show all important facts
+#   debug:
+#     msg:
+#       - "Agent Policy ID: {{ agent_policy_id | default('not set') }}"
+#       - "Enrollment Token: {{ enrollment_token | default('not set') }}"
+#       - "Existing Enrollment Key: {{ existing_enrollment_key | default('none') }}"
+#       - "Created Enrollment Key Response: {{ enroll_key_resp | default('none') }}"
+#   when: inventory_hostname == "vm2"
