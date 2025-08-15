@@ -1,20 +1,20 @@
-# - name: Deploy Elasticsearch
-#   hosts: elasticsearch_nodes
-#   become: true
-#   roles:
-#     - elasticsearch
+- name: Deploy Elasticsearch
+  hosts: elasticsearch_nodes
+  become: true
+  roles:
+    - elasticsearch
 
-# - name: Deploy Kibana
-#   hosts: kibana_nodes
-#   become: true
-#   roles:
-#     - kibana
+- name: Deploy Kibana
+  hosts: kibana_nodes
+  become: true
+  roles:
+    - kibana
 
-# - name: Deploy certificate
-#   hosts: elasticsearch_nodes
-#   become: true
-#   roles:
-#     - certificates
+- name: Deploy certificate
+  hosts: elasticsearch_nodes
+  become: true
+  roles:
+    - certificates
 
 - name: Deploy certificate
   hosts: elasticsearch_nodes
